@@ -1,0 +1,377 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+  <title>Price Alert India</title>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
+  <style>
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      font-family: Arial, sans-serif;
+      background: #f4f6f9;
+      color: #222;
+    }
+
+    header {
+      background: #123b70;
+      color: white;
+      padding: 22px 15px;
+      text-align: center;
+    }
+
+    header h1 {
+      margin: 0 0 8px;
+    }
+
+    header p {
+      margin: 0;
+    }
+
+    .search-area {
+      padding: 18px;
+      text-align: center;
+    }
+
+    #search {
+      width: 100%;
+      max-width: 500px;
+      padding: 12px;
+      border: 1px solid #ccc;
+      border-radius: 8px;
+      font-size: 16px;
+    }
+
+    #status {
+      text-align: center;
+      padding: 12px;
+      color: #444;
+    }
+
+    #products {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      gap: 18px;
+      padding: 18px;
+      max-width: 1200px;
+      margin: auto;
+    }
+
+    .product-card {
+      background: white;
+      border-radius: 10px;
+      padding: 15px;
+      box-shadow: 0 2px 9px #00000012;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .product-image {
+      width: 100%;
+      height: 180px;
+      object-fit: contain;
+      margin-bottom: 12px;
+    }
+
+    .product-name {
+      font-size: 18px;
+      margin: 8px 0;
+      overflow-wrap: anywhere;
+    }
+
+    .price {
+      color: #087443;
+      font-size: 21px;
+      font-weight: bold;
+      margin: 8px 0;
+    }
+
+    .target-price {
+      color: #555;
+      margin: 5px 0;
+    }
+
+    .buy-button {
+      display: block;
+      background: #ff9f00;
+      color: #111;
+      text-decoration: none;
+      text-align: center;
+      padding: 12px;
+      border-radius: 7px;
+      font-weight: bold;
+      margin-top: auto;
+    }
+
+    .buy-button:hover {
+      background: #f28c00;
+    }
+
+    footer {
+      background: #123b70;
+      color: white;
+      text-align: center;
+      padding: 18px;
+      margin-top: 25px;
+    }
+  </style>
+</head>
+
+<body>
+
+  <header>
+    <h1>Price Alert India</h1>
+    <p>Find Products. Compare Prices. Save Money.</p>
+  </header>
+
+  <div class="search-area">
+    <input
+      type="search"
+      id="search"
+      placeholder="Search products..."
+      aria-label="Search products"
+    >
+  </div>
+
+  <p id="status" role="status">Loading products...</p>
+
+  <main id="products"></main>
+
+  <footer>
+    <p>Price Alert India - Smart Shopping Starts Here</p>
+  </footer>
+
+  <script>
+    // STEP 1: Enter your Supabase project URL.
+    const SUPABASE_URL = "YOUR_SUPABASE_PROJECT_URL";
+
+    // STEP 2: Enter your Supabase publishable key
+    // or legacy anon public key.
+    const SUPABASE_KEY = "YOUR_SUPABASE_PUBLISHABLE_OR_ANON_KEY";
+
+    const statusElement = document.getElementById("status");
+    const productsElement = document.getElementById("products");
+    const searchElement = document.getElementById("search");
+
+    let allProducts = [];
+    let db = null;
+
+    function showError(message) {
+      statusElement.textContent = message;
+    }
+
+    function getValue(product, names) {
+      for (const name of names) {
+        if (
+          product[name] !== undefined &&
+          product[name] !== null &&
+          product[name] !== ""
+        ) {
+          return product[name];
+        }
+      }
+
+      return "";
+    }
+
+    function displayProducts(products) {
+      productsElement.replaceChildren();
+
+      if (!products.length) {
+        statusElement.textContent = "No products found.";
+        return;
+      }
+
+      statusElement.textContent =
+        products.length + " product(s) found.";
+
+      products.forEach(function(product) {
+        const card = document.createElement("article");
+        card.className = "product-card";
+
+        const name = getValue(product, [
+          "name",
+          "product_name",
+          "title"
+        ]) || "Unnamed Product";
+
+        const price = getValue(product, [
+          "current_price",
+          "current price",
+          "price"
+        ]);
+
+        const targetPrice = getValue(product, [
+          "target_price",
+          "target price"
+        ]);
+
+        const imageUrl = getValue(product, [
+          "image_url",
+          "image",
+          "image_link",
+          "product_image"
+        ]);
+
+        const productUrl = getValue(product, [
+          "url",
+          "product_url",
+          "link"
+        ]);
+
+        if (imageUrl) {
+          const image = document.createElement("img");
+          image.className = "product-image";
+          image.alt = name;
+          image.loading = "lazy";
+
+          try {
+            const parsedImageUrl = new URL(imageUrl);
+
+            if (parsedImageUrl.protocol === "https:" ||
+                parsedImageUrl.protocol === "http:") {
+              image.src = parsedImageUrl.href;
+              image.onerror = function() {
+                image.remove();
+              };
+              card.appendChild(image);
+            }
+          } catch (error) {
+            console.warn("Invalid product image URL");
+          }
+        }
+
+        const title = document.createElement("h2");
+        title.className = "product-name";
+        title.textContent = name;
+        card.appendChild(title);
+
+        const priceElement = document.createElement("p");
+        priceElement.className = "price";
+        priceElement.textContent = price !== ""
+          ? "Current Price: ₹" + price
+          : "Price not available";
+        card.appendChild(priceElement);
+
+        if (targetPrice !== "") {
+          const targetElement = document.createElement("p");
+          targetElement.className = "target-price";
+          targetElement.textContent =
+            "Target Price: ₹" + targetPrice;
+          card.appendChild(targetElement);
+
+          if (
+            price !== "" &&
+            Number(price) > 0 &&
+            Number(targetPrice) > 0 &&
+            Number(price) <= Number(targetPrice)
+          ) {
+            const alert = document.createElement("p");
+            alert.textContent = "Target price reached!";
+            alert.style.color = "#087443";
+            alert.style.fontWeight = "bold";
+            card.appendChild(alert);
+          }
+        }
+
+        if (productUrl) {
+          try {
+            const parsedProductUrl = new URL(productUrl);
+
+            if (
+              parsedProductUrl.protocol === "https:" ||
+              parsedProductUrl.protocol === "http:"
+            ) {
+              const buyButton = document.createElement("a");
+              buyButton.className = "buy-button";
+              buyButton.textContent = "Buy Now";
+              buyButton.href = parsedProductUrl.href;
+              buyButton.target = "_blank";
+              buyButton.rel = "noopener noreferrer";
+              card.appendChild(buyButton);
+            }
+          } catch (error) {
+            console.warn("Invalid product URL");
+          }
+        }
+
+        productsElement.appendChild(card);
+      });
+    }
+
+    async function loadProducts() {
+      if (
+        SUPABASE_URL === "YOUR_SUPABASE_PROJECT_URL" ||
+        SUPABASE_KEY === "YOUR_SUPABASE_PUBLISHABLE_OR_ANON_KEY"
+      ) {
+        showError(
+          "Setup required: add your Supabase URL and public key in the code."
+        );
+        return;
+      }
+
+      try {
+        statusElement.textContent = "Loading products...";
+
+        db = window.supabase.createClient(
+          SUPABASE_URL,
+          SUPABASE_KEY
+        );
+
+        const result = await Promise.race([
+          db.from("products").select("*"),
+          new Promise(function(_, reject) {
+            setTimeout(function() {
+              reject(new Error(
+                "Connection timed out. Check your internet and Supabase settings."
+              ));
+            }, 15000);
+          })
+        ]);
+
+        if (result.error) {
+          throw result.error;
+        }
+
+        allProducts = result.data || [];
+        displayProducts(allProducts);
+
+      } catch (error) {
+        console.error("Products loading error:", error);
+
+        showError(
+          "Could not load products: " +
+          (error.message || "Unknown error") +
+          " Check your Supabase table and permissions."
+        );
+      }
+    }
+
+    searchElement.addEventListener("input", function() {
+      const query = searchElement.value.toLowerCase().trim();
+
+      const filteredProducts = allProducts.filter(function(product) {
+        const name = getValue(product, [
+          "name",
+          "product_name",
+          "title"
+        ]);
+
+        return String(name).toLowerCase().includes(query);
+      });
+
+      displayProducts(filteredProducts);
+    });
+
+    loadProducts();
+  </script>
+
+</body>
+</html>
