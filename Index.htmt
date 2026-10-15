@@ -150,7 +150,7 @@
 
   <script>
     // STEP 1: Enter your Supabase project URL.
-    const SUPABASE_URL = "YOUR_SUPABASE_PROJECT_URL";
+    const SUPABASE_URL = "https://wdkyywiwvqsevpcdzkze.supabase.co";
 
     // STEP 2: Enter your Supabase publishable key
     // or legacy anon public key.
